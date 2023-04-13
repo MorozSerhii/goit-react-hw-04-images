@@ -1,116 +1,95 @@
 import 'index.css';
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { SearchBar } from './SerchBar/SerchBar';
-import * as Api from '../Api/Api';
+import SerchImageApi from '../Api/Api';
 import { ImageGallery } from './ImageGallery/ImageGallery';
 import { Loader } from './Loader/Loader';
 import { Modal } from './Modal/Modal';
 import { Button } from './Button/Button';
 import toast, { Toaster } from 'react-hot-toast';
-export class App extends Component {
-  state = {
-    images: [],
-    isLoading: false,
-    modalShown: false,
-    largeImg: '',
-    isDisabled: false,
-    value: '',
-    page: 1,
-    TotalHits: null,
-  };
 
-  componentDidUpdate(_, prevState) {
-    const { page, value } = this.state;
-    if (prevState.page !== page || prevState.value !== value) {
-      this.searchImages(value, page);
+export const App = () => {
+  const [images, setImages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [modalShown, setModalShown] = useState(false);
+  const [largeImg, setlargeImg] = useState('');
+  const [value, setValue] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalHits, setTotalHits] = useState(null);
+  const [isDisabled, setIsDisabled] = useState(false);
+
+  useEffect(() => {
+    if (value === '') {
+      return;
     }
-  }
+    const searchImages = async () => {
+      try {
+        setIsDisabled(true);
+        setIsLoading(true);
+        const { totalHits, hits } = await SerchImageApi(value, page);
+        const totalHitsRes = Math.ceil(totalHits / 12);
+        setTotalHits(totalHitsRes);
 
-  setSearchQuery = query => {
-    const { page, value } = this.state;
-    this.setState({ value: query, page: 1 });
-    if (query === value) {
-      this.searchImages(query, page);
-    }
-  };
+        if (totalHits === 0) {
+          toast.error('write something normal 😵‍💫', {
+            duration: 1000,
+            position: 'top-right',
+          });
 
-  searchImages = async (values, page) => {
-    try {
-      this.setState({ isLoading: true, isDisabled: false });
-      const data = await Api.SerchImage(values, page);
-      const totalHits = Math.ceil(data.totalHits / 12);
-      if (totalHits === 0) {
-        toast.error('write something normal 😵‍💫', {
-          duration: 1000,
-          position: 'top-right',
-        });
-        return;
+          return;
+        }
+        setImages(prevState => [...prevState, ...hits]);
+
+        setIsLoading(false);
+        if (page > 1) {
+          setTimeout(() => {
+            window.scrollBy({
+              top: 600,
+              behavior: 'smooth',
+            });
+          });
+        }
+      } catch (error) {
+        throw new Error(error);
+      } finally {
+        setIsLoading(false);
       }
-      this.setState({ TotalHits: totalHits });
-      this.loadMoreBtnShown(totalHits);
-      this.setState(prevState => ({
-        images: [...prevState.images, ...data.hits],
-        isLoading: false,
-      }));
-    } catch (error) {
-      throw new Error(error);
-    } finally {
-      this.setState({ isLoading: false });
+    };
+
+    searchImages();
+  }, [value, page]);
+
+  const setSearchQuery = query => {
+    if (query === value) {
+      setValue('');
+
+      return;
     }
-  };
-  openModal = img => {
-    this.setState(({ modalShown }) => ({
-      modalShown: !modalShown,
-      largeImg: img,
-    }));
-  };
-  loadMoreBtnShown = value => {
-    if (value > 1) {
-      this.setState({ isDisabled: true });
-    } else {
-      this.setState({ isDisabled: false });
-    }
-  };
-  loadMorePage = () => {
-    this.setState(prevStates => ({ page: prevStates.page + 1 }));
-    this.onScroll(this.state.page);
-    this.onScroll();
-  };
-  onScroll = () => {
-    setTimeout(() => {
-      window.scrollBy({
-        top: 560,
-        behavior: 'smooth',
-      });
-    }, 100);
-  };
-  onReset = () => {
-    this.setState({ images: [] });
+    setImages([]);
+    setPage(1);
+    setValue(query);
   };
 
-  render() {
-    const {
-      images,
-      isLoading,
-      modalShown,
-      largeImg,
-      isDisabled,
-      page,
-      TotalHits,
-    } = this.state;
-    return (
-      <div className="App">
-        <SearchBar onSubmit={this.setSearchQuery} onReset={this.onReset} />
-        {images.length > 0 && (
-          <ImageGallery images={images} modalShown={this.openModal} />
-        )}
-        {isLoading && <Loader />}
-        {modalShown && <Modal value={largeImg} modalShown={this.openModal} />}
-        {isDisabled && TotalHits !== page && (
-          <Button loadMore={this.loadMorePage} />
-        )}
-        <Toaster />
-      </div>
-    );
-  }
-}
+  const openModal = img => {
+    setModalShown(modalShown => (modalShown = !modalShown));
+    setlargeImg(img);
+  };
+  const loadMorePage = () => {
+    setPage(prevStates => prevStates + 1);
+  };
+
+  return (
+    <div className="App">
+      <SearchBar setQuery={setSearchQuery} />
+      {images.length > 0 && (
+        <ImageGallery images={images} modalShown={openModal} />
+      )}
+      {isLoading && <Loader />}
+      {modalShown && <Modal value={largeImg} modalShown={openModal} />}
+      {isDisabled && totalHits !== page && images.length > 0 && (
+        <Button loadMore={loadMorePage} />
+      )}
+      <Toaster />
+    </div>
+  );
+};

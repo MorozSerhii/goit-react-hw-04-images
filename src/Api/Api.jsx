@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 
 axios.defaults.baseURL = 'https://pixabay.com/api/';
 
-export const SerchImage = async (value, page = 1) => {
+export default async function SerchImageApi(value, page = 1) {
   const response = await axios({
     params: {
       per_page: 12,
@@ -13,9 +13,9 @@ export const SerchImage = async (value, page = 1) => {
     },
   });
   return response.data;
-};
+}
 
-SerchImage.propTypes = {
+SerchImageApi.propTypes = {
   value: PropTypes.string.isRequired,
   page: PropTypes.number.isRequired,
 };
